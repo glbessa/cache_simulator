@@ -1,22 +1,25 @@
 from cache import Cache
 from utils import Utils
+from memory_architecture import MemoryArchitecture
+from cache_level import CacheLevel
+from substitution_algorithm import SubstitutionAlgorithm
 
 import sys
 
 class CacheSimulator:
-    def __init__(self):
+    def __init__(self, architecture: MemoryArchitecture):
         # Tamanho do endereço em Bytes (4 Bytes = 32 bits)
         self.address_length: int = 4
         # Lista de endereços lidos em formato binário
         self.addresses: list = list()
 
-        self.architecture: Cache = Cache()
+        self.architecture: MemoryArchitecture = architecture
 
     def simulate(self):
         for addr in self.addresses:
-            self.architecture.get_address(addr)
+            self.architecture(addr)
 
-        print(self.architecture._hits)
+        print(self.architecture[0].instruction_cache._hits / self.architecture[0].instruction_cache._accesses)
 
     def read_input_file(self, filename):
         """
@@ -40,6 +43,12 @@ if __name__ == "__main__":
     output_flag = sys.argv[5]
     input_filename = sys.argv[6]
 
-    cache_simulator = CacheSimulator()
+    arch = MemoryArchitecture([
+        CacheLevel([
+            Cache(num_sets, block_size, associativity, SubstitutionAlgorithm.RANDOM)
+        ])
+    ])
+
+    cache_simulator = CacheSimulator(arch)
     cache_simulator.read_input_file(input_filename)
     cache_simulator.simulate()

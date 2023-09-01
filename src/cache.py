@@ -7,26 +7,30 @@ import math
 import random
 
 class Cache:
-    def __init__(self):
+    def __init__(self, num_sets: int, block_size: int, associativity: int, subst_algorithm: SubstitutionAlgorithm, name: str = "Cache", upper_level = None):
+        self.name = name
         # Nível da cache (L1 / L2)
         self._cache_level: int = 1
         # Tipo da Cache (unificada)
         self._cache_type: CacheType = CacheType.UNIFIED
         # Tamanho do endereco em bits
         self._address_length: int = 32
-        #
+        # Tipo de enderecamento
         self._adressed_by: AddressedType = AddressedType.BYTE
         # Tamanho da palavra em bits
         self._word_length: int = 32
+        # Upper level
+        self._upper_level = upper_level
+
 
         # Numero de conjuntos da cache
-        self._num_sets: int = 128
+        self._num_sets: int = num_sets
         # Tamanho do bloco (em bits)
-        self._block_size: int = 16
+        self._block_size: int = block_size
         # Grau de associatividade
-        self._associativity: int = 4
+        self._associativity: int = associativity
         # Algoritmo de substituição escolhido
-        self._substitution_algorithm: SubstitutionAlgorithm = SubstitutionAlgorithm.RANDOM
+        self._substitution_algorithm: SubstitutionAlgorithm = subst_algorithm
         # Tamanho total da cache (nsets * block_size * aasoc )
         self._cache_size = self._num_sets * self._block_size * self._associativity
         
@@ -52,8 +56,13 @@ class Cache:
         self._capacity_misses: int = 0
         self._conflict_misses: int = 0
 
+    def __call__(self, address: bytes):
+        return self.get(address)
 
-    def get_address(self, address: bytes):
+    def set_upper_level(self, upper_level):
+        self.upper_level = upper_level
+
+    def get(self, address: bytes):
         """
         """
         logging.info(f"Requested address {address}")
@@ -106,21 +115,19 @@ class Cache:
         index = index >> (self._tag_length + self._offset)
         index = index % (2 ** self._index_length)
 
+        data = self.upper_level(address)
+
         if self._substitution_algorithm == SubstitutionAlgorithm.RANDOM:
             num = random.randrange(0, self._associativity)
             self._tables[num]["TAG"][index] = bytes(tag)
             self._tables[num]["VAL_BIT"][index] = True
+            self._tables[num]["DATA"] = data
 
         elif self._substitution_algorithm == SubstitutionAlgorithm.FIFO:
             return
+
         else:
             return
-
-        
-        
-
-
-            
 
     def reset(self):
         """
@@ -161,6 +168,3 @@ class Cache:
     @property
     def conflict_misses(self) -> int:
         return self._conflict_misses
-
-
-      
