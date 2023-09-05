@@ -38,16 +38,23 @@ class Cache:
             self._offset: int = int(math.log2(self._block_size / self._word_length))
         else:
             self._offset: int = int(math.log2(self._block_size / 8))
-
-        # Tamanho da tag (em Bits)
+ 
+        # Tamanho do indice (em Bits)
         self._index_length: int = int(math.log2(self._num_sets))
         # Tamanho da tag (em Bits)
         self._tag_length: int = int(self._address_length - self._offset - self._index_length)
+
+        
 
         self._tables: list(dict[list[bytes], list[bool], list[bytes]]) = []
         for _ in range(self._associativity):
             self._tables.append({"TAG": [bytes(0) for _ in range(self._num_sets)], "VAL_BIT": [False for _ in range(self._num_sets)], "DATA": [bytes(0) for _ in range(self._num_sets)]})
         
+        if self._substitution_algorithm == SubstitutionAlgorithm.FIFO:
+            self.next_to_exit = [0 for _ in range(self._num_sets)]
+        elif self._substitution_algorithm == SubstitutionAlgorithm.LRU:
+            self.lru_aux = [[i for i in range(self._associativity)] for _ in range(self._num_sets)]
+
         self._accessed_addreses: list = list()
         
         self._hits: int = 0
@@ -75,19 +82,13 @@ class Cache:
         compulsory_flag = True
         capacity_flag = True
         hit_flag = False
-        # [
-        #     {
-        #         valbit : [indice] -> 0 ou 1 
-        #     },
-        #     {
-
-        #     },
-        #     {
-
-        #     },
-        # ]
+  
         self._accesses += 1
-        self._accessed_addreses.append(address)
+        #self._accessed_addreses.append(address)
+
+        data = None
+
+        #
 
         for tab in self.tables:
             if tab["VAL_BIT"][index] == True:
@@ -95,6 +96,7 @@ class Cache:
                 if tab["TAG"][index] == tag:
                     self._hits += 1
                     hit_flag = True
+                    data = tab["DATA"][index]
                     break
             else:
                 capacity_flag = False
@@ -107,13 +109,16 @@ class Cache:
             else:
                 self._conflict_misses += 1
             
-            self.__handle_miss(address)
+            return self.__handle_miss(address)
+
+        return data 
 
     def __handle_miss(self, address: bytes):
         tag = bytes(int.from_bytes(address, byteorder='little') >> (self._index_length + self._offset))
         index = int.from_bytes(address, byteorder='little') << self._tag_length
         index = index >> (self._tag_length + self._offset)
         index = index % (2 ** self._index_length)
+        # print(index)
 
         data = self.upper_level(address)
 
@@ -121,13 +126,39 @@ class Cache:
             num = random.randrange(0, self._associativity)
             self._tables[num]["TAG"][index] = bytes(tag)
             self._tables[num]["VAL_BIT"][index] = True
-            self._tables[num]["DATA"] = data
+            self._tables[num]["DATA"][index] = data
 
         elif self._substitution_algorithm == SubstitutionAlgorithm.FIFO:
-            return
+            self._tables[self.next_to_exit[index]]["TAG"][index] = bytes(tag)
+            self._tables[self.next_to_exit[index]]["VAL_BIT"][index] = True
+            self._tables[self.next_to_exit[index]]["DATA"][index] = data
 
-        else:
-            return
+            if self.next_to_exit[index] + 1 >= len(self._tables):
+                self.next_to_exit[index] = 0
+            else:
+                self.next_to_exit[index] += 1
+
+            # se cache ta cheia
+            # if all(self._tables[num]["VAL_BIT"][index]):
+            #     oldest_address_position = self._tables["QUEUE"][index][0]
+            #     self._tables["QUEUE"][index][0].pop(0) # pegando pop da fila
+            # else:
+            #     for i in range(self._associativity): #
+            #         if self._tables[i]["VAL_BIT"][index] == 0:
+            #             oldest_address_position = i
+            #             break
+
+            # self._tables[oldest_address_position]["TAG"][index] = bytes(tag)
+            # self._tables[oldest_address_position]["VAL_BIT"][index] = True
+            # self._tables[oldest_address_position]["DATA"] = data
+
+            # queue vai ser uma fila de index
+            # self._tables["QUEUE"][index].append(oldest_address_position)
+
+        elif self._substitution_algorithm == SubstitutionAlgorithm.LRU:
+            pass
+
+        return data
 
     def reset(self):
         """
