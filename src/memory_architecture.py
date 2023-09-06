@@ -29,8 +29,7 @@ class MemoryArchitecture:
 
         self.arch.append(level)
 
-    def __call__(self,
-                 address):
+    def __call__(self, address):
         if not self.instruction_range and not self.data_range:
             # Assume that its first level is unified
             self.arch[0].instruction_cache(address)
@@ -39,6 +38,6 @@ class MemoryArchitecture:
         return self.arch[index]
 
     def reset(self):
-        for level in self.arch[:-1]:
+        for level in self.arch:
             level.reset()
     

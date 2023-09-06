@@ -5,6 +5,7 @@ from addressed_type import AddressedType
 import logging
 import math
 import random
+import array 
 
 class Cache:
     def __init__(self, num_sets: int, block_size: int, associativity: int, subst_algorithm: SubstitutionAlgorithm, name: str = "Cache", upper_level = None):
@@ -22,11 +23,10 @@ class Cache:
         # Upper level
         self._upper_level = upper_level
 
-
         # Numero de conjuntos da cache
         self._num_sets: int = num_sets
         # Tamanho do bloco (em bits)
-        self._block_size: int = block_size
+        self._block_size: int = block_size * 8
         # Grau de associatividade
         self._associativity: int = associativity
         # Algoritmo de substituição escolhido
@@ -44,16 +44,19 @@ class Cache:
         # Tamanho da tag (em Bits)
         self._tag_length: int = int(self._address_length - self._offset - self._index_length)
 
-        
+        self._aux1 = self._index_length + self._offset
+        self._aux2 = self._tag_length + self._offset
+        self._aux3 = 2 ** self._index_length
 
-        self._tables: list(dict[list[bytes], list[bool], list[bytes]]) = []
+        self._tables: list(dict[list[int], list[bool], list[int]]) = []
         for _ in range(self._associativity):
-            self._tables.append({"TAG": [bytes(0) for _ in range(self._num_sets)], "VAL_BIT": [False for _ in range(self._num_sets)], "DATA": [bytes(0) for _ in range(self._num_sets)]})
+            self._tables.append({"TAG": [0 for _ in range(self._num_sets)], "VAL_BIT": [False for _ in range(self._num_sets)], "DATA": [0 for _ in range(self._num_sets)]})
         
         if self._substitution_algorithm == SubstitutionAlgorithm.FIFO:
             self.next_to_exit = [0 for _ in range(self._num_sets)]
         elif self._substitution_algorithm == SubstitutionAlgorithm.LRU:
             self.lru_aux = [[i for i in range(self._associativity)] for _ in range(self._num_sets)]
+            #[0, 1, 2, 3] # assoc = 4
 
         self._accessed_addreses: list = list()
         
@@ -63,73 +66,72 @@ class Cache:
         self._capacity_misses: int = 0
         self._conflict_misses: int = 0
 
-    def __call__(self, address: bytes):
+    def __call__(self, address: int):
         return self.get(address)
 
     def set_upper_level(self, upper_level):
         self.upper_level = upper_level
 
-    def get(self, address: bytes):
+    def get(self, address: int):
         """
         """
-        logging.info(f"Requested address {address}")
+        #logging.info(f"Requested address {address}")
 
-        tag = bytes(int.from_bytes(address, byteorder='little') >> (self._index_length + self._offset))
-        index = int.from_bytes(address, byteorder='little') << self._tag_length
-        index = index >> (self._tag_length + self._offset)
-        index = index % (2 ** self._index_length)
+        tag = address >> self._aux1
+        index = address << self._tag_length
+        index = index >> (self._aux2)
+        index = index % self._aux3
 
         compulsory_flag = True
         capacity_flag = True
         hit_flag = False
   
         self._accesses += 1
-        #self._accessed_addreses.append(address)
 
         data = None
 
-        #
+        data_index = 0
 
-        for tab in self.tables:
+        for i, tab in enumerate(self.tables):
             if tab["VAL_BIT"][index] == True:
                 compulsory_flag = False
                 if tab["TAG"][index] == tag:
                     self._hits += 1
                     hit_flag = True
+                    data_index = i
                     data = tab["DATA"][index]
                     break
             else:
                 capacity_flag = False
 
         if hit_flag == False:
-            if compulsory_flag == True:
+            if compulsory_flag:
                 self._compulsory_misses += 1
             elif capacity_flag == True:
                 self._capacity_misses += 1
             else:
                 self._conflict_misses += 1
             
-            return self.__handle_miss(address)
+            return self.__handle_miss(address, tag, index)
+
+        if self._substitution_algorithm == SubstitutionAlgorithm.LRU:
+            for i, _ in enumerate(self.lru_aux[index]):
+                self.lru_aux[index][i] += 1
+            self.lru_aux[index][data_index] = 0
 
         return data 
 
-    def __handle_miss(self, address: bytes):
-        tag = bytes(int.from_bytes(address, byteorder='little') >> (self._index_length + self._offset))
-        index = int.from_bytes(address, byteorder='little') << self._tag_length
-        index = index >> (self._tag_length + self._offset)
-        index = index % (2 ** self._index_length)
-        # print(index)
-
+    def __handle_miss(self, address: int, tag: int, index:int):
         data = self.upper_level(address)
 
         if self._substitution_algorithm == SubstitutionAlgorithm.RANDOM:
             num = random.randrange(0, self._associativity)
-            self._tables[num]["TAG"][index] = bytes(tag)
+            self._tables[num]["TAG"][index] = tag
             self._tables[num]["VAL_BIT"][index] = True
             self._tables[num]["DATA"][index] = data
 
         elif self._substitution_algorithm == SubstitutionAlgorithm.FIFO:
-            self._tables[self.next_to_exit[index]]["TAG"][index] = bytes(tag)
+            self._tables[self.next_to_exit[index]]["TAG"][index] = tag
             self._tables[self.next_to_exit[index]]["VAL_BIT"][index] = True
             self._tables[self.next_to_exit[index]]["DATA"][index] = data
 
@@ -138,25 +140,22 @@ class Cache:
             else:
                 self.next_to_exit[index] += 1
 
-            # se cache ta cheia
-            # if all(self._tables[num]["VAL_BIT"][index]):
-            #     oldest_address_position = self._tables["QUEUE"][index][0]
-            #     self._tables["QUEUE"][index][0].pop(0) # pegando pop da fila
-            # else:
-            #     for i in range(self._associativity): #
-            #         if self._tables[i]["VAL_BIT"][index] == 0:
-            #             oldest_address_position = i
-            #             break
-
-            # self._tables[oldest_address_position]["TAG"][index] = bytes(tag)
-            # self._tables[oldest_address_position]["VAL_BIT"][index] = True
-            # self._tables[oldest_address_position]["DATA"] = data
-
-            # queue vai ser uma fila de index
-            # self._tables["QUEUE"][index].append(oldest_address_position)
-
         elif self._substitution_algorithm == SubstitutionAlgorithm.LRU:
-            pass
+            # O MAIS USADO VAI TER VALOR 0
+            # O MENOS USADO VAI TER VALOR SELF._ASSOCIATIVY - 1
+
+            least_used_index = 0
+            max_count = self.lru_aux[index][0]
+            for i, val in enumerate(self.lru_aux[index]):
+                if val > max_count:
+                    least_used_index = i
+                    max_count = val
+                self.lru_aux[index][i] += 1 
+            
+            self.lru_aux[index][least_used_index] = 0
+            self._tables[least_used_index]["TAG"][index] = tag
+            self._tables[least_used_index]["VAL_BIT"][index] = True
+            self._tables[least_used_index]["DATA"][index] = data
 
         return data
 
@@ -165,7 +164,9 @@ class Cache:
         Resetando as variáveis para valor inicial
         """
         
-        self._table = {"TAG": list(), "VAL_BIT": list(), "DATA": list()}
+        self._tables: list(dict[list[int], list[bool], list[int]]) = []
+        for _ in range(self._associativity):
+            self._tables.append({"TAG": [0 for _ in range(self._num_sets)], "VAL_BIT": [False for _ in range(self._num_sets)], "DATA": [0 for _ in range(self._num_sets)]})
         self._hits: int = 0
         self._accesses: int = 0
         self._compulsory_misses: int = 0

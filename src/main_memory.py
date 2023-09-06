@@ -3,4 +3,4 @@ class MainMemory:
         pass
     
     def __call__(self, address):
-        return bytes(0)
+        return 0

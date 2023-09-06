@@ -1,14 +1,18 @@
 from cache import Cache
-from utils import Utils
-from memory_architecture import MemoryArchitecture
 from cache_level import CacheLevel
+from memory_architecture import MemoryArchitecture
 from substitution_algorithm import SubstitutionAlgorithm
 
 import sys
-from tqdm import tqdm
+
+try:
+    from tqdm import tqdm
+except ModuleNotFoundError as ex:
+    print(ex)
 
 class CacheSimulator:
     def __init__(self, architecture: MemoryArchitecture):
+
         # Tamanho do endereço em Bytes (4 Bytes = 32 bits)
         self.address_length: int = 4
         # Lista de endereços lidos em formato binário
@@ -17,11 +21,12 @@ class CacheSimulator:
         self.architecture: MemoryArchitecture = architecture
 
     def simulate(self):
-        for addr in tqdm(self.addresses):
-            self.architecture(addr)
-
-        # self.print_raw_outputs()
-        self.print_bonito()
+        try:
+            for addr in tqdm(self.addresses):
+                self.architecture(addr)
+        except:
+            for addr in tqdm(self.addresses):
+                self.architecture(addr)
 
     def read_input_file(self, filename):
         """
@@ -33,41 +38,77 @@ class CacheSimulator:
             chunk = reader.read(self.address_length)
 
             while chunk:
-                self.addresses.append(Utils.big_endian2little_endian(chunk))
+                self.addresses.append(int.from_bytes(chunk, 'big'))
                 chunk = reader.read(self.address_length)
-
-    # Total de acessos, Taxa de hit, Taxa de miss, Taxa de miss compulsório, Taxa de miss de capacidade, Taxa de miss de conflito
 
     def print_raw_outputs(self):
         print(f"{self.architecture[0].instruction_cache.accesses}", end=" ")
-        print(f"{self.architecture[0].instruction_cache.hits/self.architecture[0].instruction_cache.accesses}", end=" ")
-        print(f"{self.architecture[0].instruction_cache.misses/self.architecture[0].instruction_cache.accesses}", end=" ")
-        print(f"{self.architecture[0].instruction_cache.compulsory_misses/self.architecture[0].instruction_cache.accesses}", end=" ")
-        print(f"{self.architecture[0].instruction_cache.capacity_misses/self.architecture[0].instruction_cache.accesses}", end=" ")
-        print(f"{self.architecture[0].instruction_cache.conflict_misses/self.architecture[0].instruction_cache.accesses}")
+        print(f"{round(self.architecture[0].instruction_cache.hits/self.architecture[0].instruction_cache.accesses, 4)}", end=" ")
+        print(f"{round(self.architecture[0].instruction_cache.misses/self.architecture[0].instruction_cache.accesses, 4)}", end=" ")
+        print(f"{round(self.architecture[0].instruction_cache.compulsory_misses/self.architecture[0].instruction_cache.misses, 4)}", end=" ")
+        print(f"{round(self.architecture[0].instruction_cache.capacity_misses/self.architecture[0].instruction_cache.misses, 4)}", end=" ")
+        print(f"{round(self.architecture[0].instruction_cache.conflict_misses/self.architecture[0].instruction_cache.misses, 4)}")
 
-    def print_bonito(self):
-        print(f"Acessos = {self.architecture[0].instruction_cache.accesses}")
-        print(f"Taxa de hit = {self.architecture[0].instruction_cache.hits/self.architecture[0].instruction_cache.accesses}")
-        print(f"Taxa de miss = {self.architecture[0].instruction_cache.misses/self.architecture[0].instruction_cache.accesses}")
-        print(f"Taxa de miss COMPULSORIO = {self.architecture[0].instruction_cache.compulsory_misses/self.architecture[0].instruction_cache.accesses}")
-        print(f"Taxa de miss CAPACIDADE = {self.architecture[0].instruction_cache.capacity_misses/self.architecture[0].instruction_cache.accesses}")
-        print(f"Taxa de miss CONFLITO = {self.architecture[0].instruction_cache.conflict_misses/self.architecture[0].instruction_cache.accesses}")
+    def print_styled_outputs(self):
+        print(f"Acessos                  = {self.architecture[0].instruction_cache.accesses}")
+        print(f"Taxa de hit              = {self.architecture[0].instruction_cache.hits/self.architecture[0].instruction_cache.accesses}%")
+        print(f"Taxa de miss             = {self.architecture[0].instruction_cache.misses/self.architecture[0].instruction_cache.accesses}%")
+        print(f"Taxa de miss COMPULSORIO = {self.architecture[0].instruction_cache.compulsory_misses/self.architecture[0].instruction_cache.accesses}%")
+        print(f"Taxa de miss CAPACIDADE  = {self.architecture[0].instruction_cache.capacity_misses/self.architecture[0].instruction_cache.accesses}%")
+        print(f"Taxa de miss CONFLITO    = {self.architecture[0].instruction_cache.conflict_misses/self.architecture[0].instruction_cache.accesses}%")
 
-if __name__ == "__main__":
-    num_sets = int(sys.argv[1])
-    block_size = int(sys.argv[2])*8
-    associativity = int(sys.argv[3])
-    subst_algorithm = sys.argv[4]
-    output_flag = sys.argv[5]
-    input_filename = sys.argv[6]
+
+
+
+def print_help():
+    print("usage: python cache_simulator.py <num_sets> <block_size> <associativy> <subst_algorithm> <output_flag> <input_filename>")
+    print("\targ[1]: num_sets (Número de Conjuntos)")
+    print("\targ[2]: block_size (Tamanho do bloco em bytes)")
+    print("\targ[3]: associativity (Grau de associatividade)")
+    print("\targ[4]: subst_algorithm (Algoritmo de Substituição: L - LRU, R - RANDOM, F - FIFO)")
+    print("\targ[5]: output_flag (Modo de saída: 0 - Output com informações, 1 - Raw output)")
+    print("\targ[6]: input_filename (Path do arquivo de input)")
+
+def main():
+    try:
+        num_sets = int(sys.argv[1])
+        block_size = int(sys.argv[2])
+        associativity = int(sys.argv[3])
+        subst_algorithm = sys.argv[4]
+        output_flag = int(sys.argv[5])
+        input_filename = sys.argv[6]
+    except ValueError as ex:
+        print_help()
+        return
+
+    subst = None
+
+    if subst_algorithm.upper() == "F":
+        subst = SubstitutionAlgorithm.FIFO
+    elif subst_algorithm.upper() == "L":
+        subst = SubstitutionAlgorithm.LRU
+    elif subst_algorithm.upper() == "R":
+        subst = SubstitutionAlgorithm.RANDOM
+    else:
+        print_help()
+        return
+        
 
     arch = MemoryArchitecture([
         CacheLevel([
-            Cache(num_sets, block_size, associativity, SubstitutionAlgorithm.FIFO)
+            Cache(num_sets, block_size, associativity, subst)
         ])
     ])
 
     cache_simulator = CacheSimulator(arch)
     cache_simulator.read_input_file(input_filename)
     cache_simulator.simulate()
+
+    if output_flag == 1:
+        cache_simulator.print_raw_outputs()
+    else:
+        cache_simulator.print_styled_outputs()
+    
+
+if __name__ == "__main__":
+    main()
