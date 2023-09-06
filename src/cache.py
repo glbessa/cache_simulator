@@ -1,6 +1,6 @@
-from substitution_algorithm import SubstitutionAlgorithm
-from cache_type import CacheType
-from addressed_type import AddressedType
+from utils.substitution_algorithm import SubstitutionAlgorithm
+from utils.cache_type import CacheType
+from utils.addressed_type import AddressedType
 
 import logging
 import math

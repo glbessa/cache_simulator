@@ -1,14 +1,16 @@
 from cache import Cache
 from cache_level import CacheLevel
 from memory_architecture import MemoryArchitecture
-from substitution_algorithm import SubstitutionAlgorithm
+from utils.substitution_algorithm import SubstitutionAlgorithm
 
 import sys
+
+TQDM_FOUND = True
 
 try:
     from tqdm import tqdm
 except ModuleNotFoundError as ex:
-    print(ex)
+    TQDM_FOUND = False
 
 class CacheSimulator:
     def __init__(self, architecture: MemoryArchitecture):
@@ -21,11 +23,11 @@ class CacheSimulator:
         self.architecture: MemoryArchitecture = architecture
 
     def simulate(self):
-        try:
+        if TQDM_FOUND:
             for addr in tqdm(self.addresses):
                 self.architecture(addr)
-        except:
-            for addr in tqdm(self.addresses):
+        else:
+            for addr in self.addresses:
                 self.architecture(addr)
 
     def read_input_file(self, filename):
@@ -50,12 +52,12 @@ class CacheSimulator:
         print(f"{round(self.architecture[0].instruction_cache.conflict_misses/self.architecture[0].instruction_cache.misses, 4)}")
 
     def print_styled_outputs(self):
-        print(f"Acessos                  = {self.architecture[0].instruction_cache.accesses}")
-        print(f"Taxa de hit              = {self.architecture[0].instruction_cache.hits/self.architecture[0].instruction_cache.accesses}%")
-        print(f"Taxa de miss             = {self.architecture[0].instruction_cache.misses/self.architecture[0].instruction_cache.accesses}%")
-        print(f"Taxa de miss COMPULSORIO = {self.architecture[0].instruction_cache.compulsory_misses/self.architecture[0].instruction_cache.accesses}%")
-        print(f"Taxa de miss CAPACIDADE  = {self.architecture[0].instruction_cache.capacity_misses/self.architecture[0].instruction_cache.accesses}%")
-        print(f"Taxa de miss CONFLITO    = {self.architecture[0].instruction_cache.conflict_misses/self.architecture[0].instruction_cache.accesses}%")
+        print(f"Acessos                  = {round(self.architecture[0].instruction_cache.accesses, 4)}")
+        print(f"Taxa de hit              = {round(self.architecture[0].instruction_cache.hits/self.architecture[0].instruction_cache.accesses, 4)}")
+        print(f"Taxa de miss             = {round(self.architecture[0].instruction_cache.misses/self.architecture[0].instruction_cache.accesses, 4)}")
+        print(f"Taxa de miss compulsório = {round(self.architecture[0].instruction_cache.compulsory_misses/self.architecture[0].instruction_cache.accesses, 4)}")
+        print(f"Taxa de miss capacidade  = {round(self.architecture[0].instruction_cache.capacity_misses/self.architecture[0].instruction_cache.accesses, 4)}")
+        print(f"Taxa de miss conflito    = {round(self.architecture[0].instruction_cache.conflict_misses/self.architecture[0].instruction_cache.accesses, 4)}")
 
 
 

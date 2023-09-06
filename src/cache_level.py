@@ -1,4 +1,4 @@
-from cache_type import CacheType
+from utils.cache_type import CacheType
 
 class CacheLevel:
     def __init__(self, level: list):
